@@ -171,6 +171,11 @@ h1.title{font-family:var(--oldmin); font-weight:900; letter-spacing:.22em;
 .luck-hint{font-size:11.5px; color:var(--ink-3); margin-top:2px}
 #luckDetail,#luckDetail2{display:none; margin-top:10px}
 #luckDetail.show,#luckDetail2.show{display:block; animation:rise .3s ease}
+.rk-phase{font-family:var(--serif); font-weight:700; font-size:16px; margin:5px 0 1px}
+.t-warn{color:var(--warn)} .t-bad{color:var(--bad)}
+.lc-dot.t-warn{background:var(--warn)} .lc-dot.t-bad{background:var(--bad)}
+#rokuseiDetail{display:none; margin-top:10px}
+#rokuseiDetail.show{display:block; animation:rise .3s ease}
 /* body star chart */
 .jt-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; max-width:660px; margin:0 auto}
 .jt-cell{background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:12px 9px; text-align:center;
@@ -282,7 +287,7 @@ footer{text-align:center; color:var(--ink-3); font-size:12px; margin-top:40px; l
     <div class="seal">命</div>
     <h1 class="title">天命盤</h1>
     <p class="subtitle">Four Pillars &amp; Sanmei Reading</p>
-    <p class="lead">生年月日・お名前・出生地から、四柱推命の命式と算命学の星を読み解き、気質・五行・エネルギー、そして大運と年運による時期の運勢まで図と言葉で映し出します。二人の相性も、恋愛・仕事・友情それぞれの角度から。</p>
+    <p class="lead">生年月日・お名前・出生地から、四柱推命の命式・算命学の人体星図・大運と年運・姓名判断・六星占術を読み解き、あなたの気質と運の巡りを図と言葉で映し出します。二人の相性も、恋愛・仕事・友情それぞれの角度から。</p>
   </header>
 
   <div class="mode-tabs" role="tablist">
@@ -414,6 +419,33 @@ const PILLAR_MEAN={
  '日柱':{tag:'自分・配偶者',mean:'あなた自身と配偶者、結婚後〜中年期の姿を映す、命式の中心の柱です。'},
  '時柱':{tag:'子供・晩年期',mean:'子供や部下、晩年期や未来へ向かう力を映す柱です。'}
 };
+// 六星占術：運命星（旬＝空亡ごと）・±・12運命周期
+const ROKUSEI_STAR=['土星人','金星人','火星人','天王星人','木星人','水星人'];
+const ROKUSEI_KUBOU=['戌亥','申酉','午未','辰巳','寅卯','子丑'];
+const ROKUSEI_STAR_TXT={
+ '土星人':'現実的で忍耐強く、コツコツ努力を積み上げる大器晩成型。地に足のついた安定志向で信頼を集めます。',
+ '金星人':'愛情深く面倒見のよい人情家。感情ゆたかで、人とのつながりや家庭を何より大切にします。',
+ '火星人':'直感と個性が際立つ自由人。好奇心旺盛でスピード感があり、独自の道を切り開きます。',
+ '天王星人':'順応力が高く器用なアイデア派。理性的で如才なく、環境に合わせて力を発揮します。',
+ '木星人':'包容力のある世話好きなリーダー気質。面倒見がよく、仲間や後輩から慕われます。',
+ '水星人':'頭の回転が速く合理的な戦略家。冷静で情報に強く、要領よく物事を進めます。'
+};
+const ROKUSEI_SIGN_TXT={'+':'（プラス）行動的で外向的。自分から動いて道を切り開くタイプ。','-':'（マイナス）思慮深く内向的。じっくり考え、信念を貫くタイプ。'};
+// 12運命周期 [名, 区分, 解説, トーン]
+const CYCLE12=[
+ ['種子','好調','新しい始まりの年。種をまき、次の12年の土台を築く好機。','good'],
+ ['緑生','好調','芽が育つ成長の年。学びや人脈が広がり、着実に前進する年。','good'],
+ ['立花','好調','花開く充実の年。努力が形になり、活動的に動ける好調期。','good'],
+ ['健弱','小殺界','変化と揺らぎの年。無理をせず体調と生活を整えたい時期。','warn'],
+ ['達成','好調','実りの年。これまでの努力が成果として結実する好調期。','good'],
+ ['乱気','中殺界','心が乱れやすい年。判断は慎重に、現状維持が無難な時期。','warn'],
+ ['再会','好調','過去とのご縁が戻る年。旧知の再会や見直しがテーマ。','good'],
+ ['財成','好調','実利が得られる年。金運や成果が安定し、地固めに向く。','good'],
+ ['安定','好調','心身が落ち着く年。守りを固め、次への英気を養う好調期。','good'],
+ ['陰影','大殺界','大殺界の入口。新しい決断や拡大は控え、静かに過ごす年。','bad'],
+ ['停止','大殺界','大殺界の中心。動かず現状維持に徹し、種まきは避ける年。','bad'],
+ ['減退','大殺界','大殺界の出口。ゆっくり回復へ。焦らず力を整える年。','bad']
+];
 /* 画数辞書（新字体・一般的な数え方の推定／編集可） */
 const STROKE={};
 (function(){const src=
@@ -725,6 +757,50 @@ function seimeiSection(M){
    </div>
  </div>`;
 }
+/* ============ 六星占術 ============ */
+function rokuseiOf(M){
+ const idx=gzIndex(M.dayStem,M.dayBranch);
+ const star=Math.floor(idx/10);
+ const sign=(M.yearBranch%2===0)?'+':'-';
+ return {idx,star,starName:ROKUSEI_STAR[star],kubou:ROKUSEI_KUBOU[star],sign,
+   typeName:ROKUSEI_STAR[star]+(sign==='+'?'プラス':'マイナス')};
+}
+function rokuseiPhase(star,sign,Y){return ((5+star*2+(sign==='+'?1:0)+(Y-2026))%12+12)%12;}
+function selRokusei(p,Y){
+ const box=document.getElementById('rokuseiDetail'); if(!box) return;
+ const c=CYCLE12[p];
+ box.innerHTML=`<h4>${Y}年　${c[0]}<span class="kk-badge ${c[3]}">${c[1]}</span></h4><p>${c[2]}</p>`;
+ box.classList.add('show','panel','detail-panel');
+ document.querySelectorAll('.rk-strip .luck-card').forEach(el=>el.classList.remove('sel'));
+ const el=document.querySelector('.rk-strip .luck-card[data-ry="'+Y+'"]'); if(el)el.classList.add('sel');
+ box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function rokuseiSection(M){
+ const r=rokuseiOf(M); const y0=new Date().getFullYear();
+ const rows=[]; for(let i=0;i<9;i++){const Y=y0+i; rows.push({Y,age:Y-M.birthYear,p:rokuseiPhase(r.star,r.sign,Y),cur:i===0});}
+ const cur=CYCLE12[rows[0].p];
+ const cards=rows.map(row=>{const c=CYCLE12[row.p];
+   return `<div class="luck-card sm ${row.cur?'cur':''}" data-ry="${row.Y}" onclick="selRokusei(${row.p},${row.Y})">
+     <div class="lc-age">${row.Y}<span>／${row.age}歳</span></div>
+     <div class="rk-phase t-${c[3]}">${c[0]}</div>
+     <div class="lc-un">${c[1]}</div>
+     <div class="lc-dot t-${c[3]}"></div></div>`;}).join('');
+ return `<div class="section">
+   <div class="section-head"><span class="kanji">六星占術</span><span class="en">Six Star</span><span class="rule"></span></div>
+   <div class="panel">
+     <h4>あなたは <span class="c-ka">${r.typeName}</span><span class="badge">${r.sign==='+'?'陽・プラス':'陰・マイナス'}</span></h4>
+     <p>${ROKUSEI_STAR_TXT[r.starName]}<br>${ROKUSEI_SIGN_TXT[r.sign]}</p>
+     <p style="margin-top:7px;font-size:12.5px;color:var(--ink-3)">生まれた日の干支 ${STEM[M.dayStem]}${BR[M.dayBranch]}（空亡：${r.kubou}）から運命星を、生まれ年の干支（${BR[M.yearBranch]}年）から陽陰を判定しています。</p>
+   </div>
+   <div class="luck-block">
+     <div class="lb-title">運命周期<span>${y0}年は「${cur[0]}」（${cur[1]}）・大殺界＝陰影/停止/減退の3年</span></div>
+     <div class="luck-strip rk-strip">${cards}</div>
+     <div class="luck-hint">▸ 各年をタップすると、その運気の詳しい解説が開きます</div>
+     <div id="rokuseiDetail"></div>
+   </div>
+   <p class="note" style="margin-top:10px;text-align:left">運命星は生まれた日の干支の空亡から、運命周期は運命星と生まれ年の干支から12年周期で判定しています。細木数子・細木かおり氏の六星占術に基づく、娯楽・参考目的の実装です（書籍・提供元により細部が異なる場合があります）。</p>
+ </div>`;
+}
 function pillarDetailHTML(M,i){
  const pl=M.pillars[i]; const se=STEM_EL[pl.stem], be=BR_EL[pl.branch]; const zo=BR_MAIN[pl.branch];
  const kan = (pl.name==='日柱')
@@ -908,6 +984,7 @@ function soloHTML(M){
  </div>
  ${luckSection(M)}
  ${seimeiSection(M)}
+ ${rokuseiSection(M)}
  ${shareSectionHTML()}`;
 }
 function miniMei(M){
