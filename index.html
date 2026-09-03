@@ -176,6 +176,18 @@ h1.title{font-family:var(--oldmin); font-weight:900; letter-spacing:.22em;
 .lc-dot.t-warn{background:var(--warn)} .lc-dot.t-bad{background:var(--bad)}
 #rokuseiDetail{display:none; margin-top:10px}
 #rokuseiDetail.show{display:block; animation:rise .3s ease}
+.ds-legend{font-size:11.5px; color:var(--ink-3); display:flex; gap:14px; flex-wrap:wrap; margin:2px 0 4px; align-items:center}
+.ds-legend .bad{color:var(--bad); font-weight:700}
+.ds-mk{display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:5px; vertical-align:0}
+.ds-mk.a{background:var(--gold)} .ds-mk.b{background:var(--k-sui)}
+.ds-grid{display:flex; gap:8px; overflow-x:auto; padding:8px 2px}
+.ds-col{flex:0 0 auto; width:92px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 6px; text-align:center; box-shadow:var(--shadow)}
+.ds-col.one{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.ds-col.both{border-color:var(--bad); box-shadow:0 0 0 2px color-mix(in srgb,var(--bad) 30%,transparent), var(--shadow)}
+.ds-y{font-size:11.5px; color:var(--ink-2); font-weight:700; font-variant-numeric:tabular-nums}
+.ds-p{font-family:var(--serif); font-weight:700; font-size:14px; margin-top:5px; padding:2px 0; border-radius:6px}
+.ds-p.bad{color:#fff; background:var(--bad)}
+.ds-p:not(.bad){color:var(--ink-2); background:var(--surface-2)}
 /* body star chart */
 .jt-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; max-width:660px; margin:0 auto}
 .jt-cell{background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:12px 9px; text-align:center;
@@ -801,6 +813,50 @@ function rokuseiSection(M){
    <p class="note" style="margin-top:10px;text-align:left">運命星は生まれた日の干支の空亡から、運命周期は運命星と生まれ年の干支から12年周期で判定しています。細木数子・細木かおり氏の六星占術に基づく、娯楽・参考目的の実装です（書籍・提供元により細部が異なる場合があります）。</p>
  </div>`;
 }
+function rokuseiCompat(A,B){
+ const ra=rokuseiOf(A), rb=rokuseiOf(B);
+ const sameStar=ra.star===rb.star, sameSign=ra.sign===rb.sign;
+ let title,text,tone;
+ if(sameStar&&!sameSign){ title='同星・陰陽が補完'; tone='good';
+   text=`ふたりとも${ra.starName}。価値観やリズムが深く響き合い、さらに陽と陰でお互いの長所を補い合える、動と静のバランスが取れた好相性です。`; }
+ else if(sameStar&&sameSign){ title='同星・同じ陰陽'; tone='good';
+   text=`ふたりとも${ra.typeName}。感覚がよく似て居心地は抜群な一方、似すぎて刺激が少なくなりがち。役割を分け合うと長続きします。`; }
+ else{ title='異なる星の化学反応'; tone='flat';
+   text=`${ra.typeName}と${rb.typeName}。育った価値観やペースが異なり、新鮮な刺激と学びのある関係。違いを面白がれるほど絆が深まります。`;
+   if(!sameSign) text+='陽と陰で、動と静のバランスも取りやすい組み合わせです。'; }
+ return {ra,rb,title,text,tone,sameStar,sameSign};
+}
+function daisakkaiOverlap(A,B){
+ const ra=rokuseiOf(A), rb=rokuseiOf(B); const y0=new Date().getFullYear(); const rows=[];
+ for(let i=0;i<7;i++){const Y=y0+i;
+   const pa=rokuseiPhase(ra.star,ra.sign,Y), pb=rokuseiPhase(rb.star,rb.sign,Y);
+   const aBad=CYCLE12[pa][3]==='bad', bBad=CYCLE12[pb][3]==='bad';
+   rows.push({Y,aPhase:CYCLE12[pa][0],bPhase:CYCLE12[pb][0],aBad,bBad,both:aBad&&bBad,either:aBad||bBad});}
+ return rows;
+}
+function rokuseiCompatHTML(A,B){
+ const rc=rokuseiCompat(A,B); const rows=daisakkaiOverlap(A,B);
+ const nA=A.name?escape(A.name):'あなた', nB=B.name?escape(B.name):'お相手';
+ const strip=rows.map(r=>`<div class="ds-col ${r.both?'both':r.either?'one':'none'}">
+   <div class="ds-y">${r.Y}</div>
+   <div class="ds-p ${r.aBad?'bad':''}">${r.aPhase}</div>
+   <div class="ds-p ${r.bBad?'bad':''}">${r.bPhase}</div></div>`).join('');
+ const anyBoth=rows.some(r=>r.both);
+ const bothYears=rows.filter(r=>r.both).map(r=>r.Y+'年').join('・');
+ return `<div class="section">
+   <div class="section-head"><span class="kanji">六星占術の相性</span><span class="en">Six Star</span><span class="rule"></span></div>
+   <div class="panel">
+     <h4>${rc.ra.typeName} <span style="color:var(--gold)">×</span> ${rc.rb.typeName}<span class="badge">${rc.title}</span></h4>
+     <p>${rc.text}</p>
+   </div>
+   <div class="luck-block">
+     <div class="lb-title">大殺界の重なり<span>今後7年の運命周期</span></div>
+     <div class="ds-legend"><span><b class="ds-mk a"></b>上＝${nA}</span><span><b class="ds-mk b"></b>下＝${nB}</span><span class="bad">■ 赤＝大殺界</span></div>
+     <div class="ds-grid">${strip}</div>
+     <p class="note" style="text-align:left;margin-top:10px">${anyBoth?'⚠ 二人の大殺界が重なる年（'+bothYears+'・濃い枠）は、結婚・起業・引越しなど大きな決断は避け、守りを固めて支え合うのが安心です。':'今後7年で二人の大殺界が重なる年はありません。片方が大殺界の年は、もう一方が支える意識を持つと安定します。'}</p>
+   </div>
+ </div>`;
+}
 function pillarDetailHTML(M,i){
  const pl=M.pillars[i]; const se=STEM_EL[pl.stem], be=BR_EL[pl.branch]; const zo=BR_MAIN[pl.branch];
  const kan = (pl.name==='日柱')
@@ -1016,6 +1072,7 @@ function duoHTML(A,B){
    </div>
  </div>
  <div class="note">相性は日主の五行関係・日支/月支の干支関係・五行の補完から算出しています。数値は縁の傾向を映す目安であり、関係を育てるのはいつもお二人自身です。</div>
+ ${rokuseiCompatHTML(A,B)}
  ${shareSectionHTML()}`;
 }
 function escape(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1089,7 +1146,7 @@ async function ensureFonts(){
   await document.fonts.ready;}catch(e){}
 }
 function drawSoloCard(M){
- const W=1080,H=1500,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const T=mkText(x);const C=CARD;
+ const W=1080,H=1620,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const T=mkText(x);const C=CARD;
  x.fillStyle=C.BG;x.fillRect(0,0,W,H);
  const g=x.createRadialGradient(W*0.82,-120,60,W*0.82,-120,1000);g.addColorStop(0,'rgba(220,187,99,0.13)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,W,H);
  x.strokeStyle=C.GOLD;x.globalAlpha=.42;x.lineWidth=2;x.strokeRect(30,30,W-60,H-60);x.globalAlpha=1;
@@ -1126,11 +1183,15 @@ function drawSoloCard(M){
   T(STEM[cd.st]+BR[cd.br]+'　'+cd.shusei+'／'+cd.un+'（'+cd.tone[1]+'）',150,1274,'500 24px "Zen Kaku Gothic New", sans-serif',C.INK,'left');
   T(N[0].Y+'年の年運  '+N[0].age+'歳',150,1330,'700 24px "Zen Kaku Gothic New", sans-serif',C.GOLD,'left');
   T(STEM[N[0].st]+BR[N[0].br]+'　'+N[0].shusei+'／'+N[0].un+'（'+N[0].tone[1]+'）',150,1368,'500 24px "Zen Kaku Gothic New", sans-serif',C.INK,'left');}
- T('天 命 盤 ・ TENMEIBAN',W/2,H-70,'700 22px "Zen Kaku Gothic New", sans-serif',C.GOLD,'center',6);
+ line(140,1424,940);
+ {const rk=rokuseiOf(M);const y0=new Date().getFullYear();const ph=CYCLE12[rokuseiPhase(rk.star,rk.sign,y0)];
+  T('六星占術  '+rk.typeName,150,1466,'700 24px "Zen Kaku Gothic New", sans-serif',C.GOLD,'left');
+  T(y0+'年の運気  '+ph[0]+'（'+ph[1]+'）',150,1504,'500 24px "Zen Kaku Gothic New", sans-serif',(ph[3]==='bad'?C.SHU:C.INK),'left');}
+ T('天 命 盤 ・ TENMEIBAN',W/2,H-66,'700 22px "Zen Kaku Gothic New", sans-serif',C.GOLD,'center',6);
  return c.toDataURL('image/png');
 }
 function drawDuoCard(A,B,type){
- const W=1080,H=1260,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const T=mkText(x);const C=CARD;
+ const W=1080,H=1340,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const T=mkText(x);const C=CARD;
  const cp=compat(A,B,type);const tl=type==='love'?'恋愛・パートナー':type==='work'?'仕事・ビジネス':'友情・仲間';
  const subs=[['恋愛',compat(A,B,'love').score],['仕事',compat(A,B,'work').score],['友情',compat(A,B,'friend').score]];
  const verd=cp.score>=80?'響き合う、得がたい縁':cp.score>=65?'相性良好、育てる価値のある関係':cp.score>=50?'違いを活かせば伸びる関係':cp.score>=35?'歩み寄りが鍵の関係':'距離感が大切な関係';
@@ -1164,8 +1225,10 @@ function drawDuoCard(A,B,type){
   T(s[1],X,942,'700 46px "Shippori Mincho B1", serif',C.INK);
   x.fillStyle=C.PANEL;roundR(x,X-90,978,180,12,6);x.fill();
   x.fillStyle=C.GOLD;roundR(x,X-90,978,Math.max(12,180*s[1]/100),12,6);x.fill();});
- T('日主 '+STEM[A.dayStem]+'（'+NISSHU[STEM[A.dayStem]][0]+'）　×　'+STEM[B.dayStem]+'（'+NISSHU[STEM[B.dayStem]][0]+'）',W/2,1070,'500 26px "Zen Kaku Gothic New", sans-serif',C.INK2);
- T('天 命 盤 ・ TENMEIBAN',W/2,H-66,'700 22px "Zen Kaku Gothic New", sans-serif',C.GOLD,'center',6);
+ T('日主 '+STEM[A.dayStem]+'（'+NISSHU[STEM[A.dayStem]][0]+'）　×　'+STEM[B.dayStem]+'（'+NISSHU[STEM[B.dayStem]][0]+'）',W/2,1055,'500 26px "Zen Kaku Gothic New", sans-serif',C.INK2);
+ {const ra=rokuseiOf(A),rb=rokuseiOf(B);
+  T('六星占術  '+ra.typeName+'　×　'+rb.typeName,W/2,1105,'700 25px "Zen Kaku Gothic New", sans-serif',C.GOLD,'center');}
+ T('天 命 盤 ・ TENMEIBAN',W/2,H-64,'700 22px "Zen Kaku Gothic New", sans-serif',C.GOLD,'center',6);
  return c.toDataURL('image/png');
 }
 function shareSectionHTML(){
